@@ -1,83 +1,60 @@
-from flask import Flask, request, jsonify
-from pymongo import MongoClient
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_bcrypt import Bcrypt
-import jwt
-import datetime
+from pymongo import MongoClient
+from bson import ObjectId
+import gridfs
 import os
 
 app = Flask(__name__)
-bcrypt = Bcrypt(app)
-app.config['SECRET_KEY'] = os.urandom(24)  # Replace with a secure key in production
+CORS(app)
 
-CORS(app, origins=['*'])
-
-uri = "mongodb+srv://co24302:VFxLb3Pw3DZruwQW@auth.dncxe.mongodb.net/?retryWrites=true&w=majority&appName=auth"
-
-# MongoDB Atlas connection
-client = MongoClient(uri)
-db = client['authSytem']
-users_collection = db['users']
+# MongoDB connection
+client = MongoClient(os.getenv('MONGODB_URI'))
+db = client['notebook_db']
+fs = gridfs.GridFS(db)
 
 try:
     client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
-except Exception as e:
-    print(e)
+    print("Ping Successful, DB Connected !")
+except:
+    print('error occured')
 
-# User Registration
-@app.route('/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    username = data.get('username').lower()
-    password = data.get('password')
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
 
-    if users_collection.find_one({'username': username}):
-        return jsonify({'message': 'User already exists'}), 400
+    # Store file in GridFS
+    file_id = fs.put(file, filename=file.filename)
+    return jsonify({'message': 'File uploaded successfully', 'file_id': str(file_id)}), 201
 
-    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    users_collection.insert_one({
-        'username': username,
-        'password': hashed_password
-    })
+@app.route('/files', methods=['GET'])
+def list_files():
+    files = fs.find()
+    file_list = [{'file_id': str(file._id), 'filename': file.filename} for file in files]
+    return jsonify(file_list), 200
 
-    return jsonify({'message': 'User registered successfully'}), 201
 
-# User Login
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    username = data.get('username').lower()
-    password = data.get('password')
-
-    user = users_collection.find_one({'username': username})
-    if user and bcrypt.check_password_hash(user['password'], password):
-        # Generate JWT token
-        token = jwt.encode({
-            'username': username,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
-        }, app.config['SECRET_KEY'], algorithm='HS256')
-
-        return jsonify({'token': token}), 200
-
-    return jsonify({'message': 'Invalid credentials'}), 401
-
-# Protected Route
-@app.route('/protected', methods=['GET'])
-def protected():
-    token = request.headers.get('Authorization')
-
-    if not token:
-        return jsonify({'message': 'Token is missing'}), 401
-
+@app.route('/files/<file_id>', methods=['GET'])
+def get_file(file_id):
     try:
-        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        username = decoded['username']
-        return jsonify({'message': f'Hello, {username}!'}), 200
-    except jwt.ExpiredSignatureError:
-        return jsonify({'message': 'Token has expired'}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({'message': 'Invalid token'}), 401
+        file_data = fs.find_one({"_id": ObjectId(file_id)})  # Convert string to ObjectId
+        if file_data:
+            response = jsonify({
+                'filename': file_data.filename,
+                'length': file_data.length,
+                'content_type': file_data.content_type
+            })
+            response.headers['Content-Disposition'] = f'attachment; filename={file_data.filename}'
+            response.data = file_data.read()
+            return response
+        else:
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
