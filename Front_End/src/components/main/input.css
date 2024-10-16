@@ -1,0 +1,18 @@
+/* Custom CSS for MessageInput */
+.message-input-custom .cs-message-input {
+    border: none !important; /* Remove the border */
+    background-color: #2B2B2B !important; /* Change background color */
+    color: white !important; /* Change text color */
+  }
+  
+  .message-input-custom .cs-message-input__content {
+    background-color: #2B2B2B !important;
+    color: white !important;
+  }
+  
+  .message-input-custom .cs-message-input__input {
+    background-color: #2B2B2B !important;
+    border: none !important;
+    color: white !important;
+  }
+  
