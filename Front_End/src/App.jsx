@@ -1,43 +1,40 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import { ChakraProvider, useToast } from '@chakra-ui/react';
-import Navbar from './components/Navbar';
-import Auth from './components/Auth';
-import Home from './components/Home';
+import React, { useState, useEffect } from 'react';
 import Register from './components/Register';
-import theme from './theme';
-import useAuth from './hooks/useAuth'; // Custom hook for auth
+import Login from './components/Login';
+import Protected from './components/Protected';
 
 const App = () => {
-    const { user, login, register, logout } = useAuth();
-    const toast = useToast(); // Using Chakra UI's toast
+  const [token, setToken] = useState('');
 
-    const handleRegister = async (username, password, email) => {
-        const success = await register(username, password, email);
-        if (success) {
-            toast({
-                title: 'Registration successful!',
-                description: "Please log in to your account.",
-                status: 'success',
-                duration: 3000,
-                isClosable: true,
-            });
-        }
-    };
+  useEffect(() => {
+    // Retrieve the token from localStorage when the app loads
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      setToken(storedToken);
+    }
+  }, []);
 
-    return (
-        <ChakraProvider theme={theme}>
-            <Router>
-                <Navbar user={user} logout={logout} />
-                <Routes>
-                    <Route path="/register" element={user ? <Navigate to="/home" /> : <Register onRegister={handleRegister} />} />
-                    <Route path="/login" element={user ? <Navigate to="/home" /> : <Auth onLogin={login} />} />
-                    <Route path="/home" element={user ? <Home /> : <Navigate to="/login" />} />
-                    <Route path="/" element={<Navigate to="/login" />} />
-                </Routes>
-            </Router>
-        </ChakraProvider>
-    );
-};
+  const handleLogout = () => {
+    setToken('');
+    localStorage.removeItem('token'); // Remove the token from localStorage
+  };
+
+  return (
+    <div>
+      <h1>Flask & React JWT Authentication</h1>
+      {!token ? (
+        <>
+          <Register />
+          <Login setToken={setToken} />
+        </>
+      ) : (
+        <>
+          <Protected token={token} />
+          <button onClick={handleLogout}>Logout</button>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default App;
