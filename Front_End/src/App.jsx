@@ -1,37 +1,43 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import 'bootstrap/dist/css/bootstrap.min.css';
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { ChakraProvider, useToast } from '@chakra-ui/react';
+import Navbar from './components/Navbar';
+import Auth from './components/Auth';
+import Home from './components/Home';
+import Register from './components/Register';
+import theme from './theme';
+import useAuth from './hooks/useAuth'; // Custom hook for auth
 
+const App = () => {
+    const { user, login, register, logout } = useAuth();
+    const toast = useToast(); // Using Chakra UI's toast
 
-function App() {
-  const [count, setCount] = useState(0)
+    const handleRegister = async (username, password, email) => {
+        const success = await register(username, password, email);
+        if (success) {
+            toast({
+                title: 'Registration successful!',
+                description: "Please log in to your account.",
+                status: 'success',
+                duration: 3000,
+                isClosable: true,
+            });
+        }
+    };
 
-  return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    return (
+        <ChakraProvider theme={theme}>
+            <Router>
+                <Navbar user={user} logout={logout} />
+                <Routes>
+                    <Route path="/register" element={user ? <Navigate to="/home" /> : <Register onRegister={handleRegister} />} />
+                    <Route path="/login" element={user ? <Navigate to="/home" /> : <Auth onLogin={login} />} />
+                    <Route path="/home" element={user ? <Home /> : <Navigate to="/login" />} />
+                    <Route path="/" element={<Navigate to="/login" />} />
+                </Routes>
+            </Router>
+        </ChakraProvider>
+    );
+};
 
-export default App
+export default App;
